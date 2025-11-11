@@ -6,6 +6,7 @@
 #include "inttypes.hpp"
 #include <cmath>
 #include <cstring>
+#include <SDL2/SDL_endian.h>
 
 // EoSD makes extensive use of the float versions of math functions made standard in C99
 //   These were mostly added to C++ with C++17, but GNU bikeshedded so hard, they didn't add
@@ -24,6 +25,31 @@
 
 namespace th06
 {
+
+// Ugly, but there's no way to do this without a temporary variable, and it beats a cursed macro
+static inline f32 SwapLE32Float(u32 in)
+{
+    u32 tmp = SDL_Swap32(in);
+    return *((f32 *)&tmp);
+}
+
+static inline f32 SwapLE32Float(f32 in)
+{
+    u32 tmp = SDL_Swap32(*((u32 *) &in));
+    return *((f32 *)&tmp);
+}
+
+static inline i16 SwapU32ToI16(u32 in)
+{
+    u16 tmp = SDL_Swap16(in);
+    return *((i16 *)&tmp);
+}
+
+static inline i16 SwapToI16(i16 in)
+{
+    u16 tmp = SDL_Swap16(*(u16 *) &in);
+    return *((i16 *)&tmp);
+}
 
 // sizeof checks kept in because technically, the standard does allow compilers to add more padding than is required
 
@@ -51,6 +77,12 @@ struct ZunVec2
     f64 VectorLengthF64()
     {
         return (f64)this->VectorLength();
+    }
+
+    void SwapToNativeEndian()
+    {
+        this->x = SwapLE32Float(this->x);
+        this->y = SwapLE32Float(this->y);
     }
 };
 static_assert(sizeof(ZunVec2) == 0x08, "ZunVec2 has additional padding between struct members!");
@@ -162,6 +194,13 @@ struct ZunVec3
         topLeftCorner->y = centerPosition->y - size->y / 2.0f;
         bottomRightCorner->x = size->x / 2.0f + centerPosition->x;
         bottomRightCorner->y = size->y / 2.0f + centerPosition->y;
+    }
+
+    void SwapToNativeEndian()
+    {
+        this->x = SwapLE32Float(this->x);
+        this->y = SwapLE32Float(this->y);
+        this->z = SwapLE32Float(this->z);
     }
 };
 static_assert(sizeof(ZunVec3) == 0x0C, "ZunVec3 has additional padding between struct members!");

@@ -317,9 +317,9 @@ union EclRawInstrArgs {
     EclRawInstrExInstrArgs exInstr;
     i32 setInt;
 
-    i32 GetBossLifeCount()
+    i32 GetIntArg()
     {
-        return this->setInt;
+        return SDL_Swap32(this->setInt);
     }
 };
 

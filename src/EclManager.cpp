@@ -46,13 +46,16 @@ ZunResult EclManager::Load(char *eclPath)
         return ZUN_ERROR;
     }
 
-    this->timelinePtrs[0] = (EclTimelineInstr *)(((u8 *)this->eclFile) + this->eclFile->timelineOffsets[0]);
+    this->eclFile->mainCount = SDL_Swap16(this->eclFile->mainCount);
+    this->eclFile->subCount = SDL_Swap16(this->eclFile->subCount);
+
+    this->timelinePtrs[0] = (EclTimelineInstr *)(((u8 *)this->eclFile) + SDL_Swap32(this->eclFile->timelineOffsets[0]));
 
     this->subTable = (EclRawInstr **)malloc(sizeof(EclRawInstr *) * this->eclFile->subCount);
 
     for (idx = 0; idx < this->eclFile->subCount; idx++)
     {
-        this->subTable[idx] = (EclRawInstr *)(((u8 *)this->eclFile) + this->eclFile->subOffsets[idx]);
+        this->subTable[idx] = (EclRawInstr *)(((u8 *)this->eclFile) + SDL_Swap32(this->eclFile->subOffsets[idx]));
     }
 
     this->timeline = this->timelinePtrs[0];
@@ -108,7 +111,7 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
         }
 
     YOLO:
-        if ((ZunBool)(enemy->currentContext.time.current == instruction->time))
+        if ((ZunBool)(enemy->currentContext.time.current == SDL_Swap32(instruction->time)))
         {
             if (!(instruction->skipForDifficulty & (1 << g_GameManager.difficulty)))
             {
@@ -116,7 +119,7 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
             }
 
             args = &instruction->args;
-            switch (instruction->opCode)
+            switch (SDL_Swap16(instruction->opCode))
             {
             case ECL_OPCODE_UNIMP:
                 return ZUN_ERROR;
@@ -128,12 +131,12 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                     break;
             case ECL_OPCODE_JUMP:
             HANDLE_JUMP:
-                enemy->currentContext.time.current = instruction->args.jump.time;
-                instruction = (EclRawInstr *)(((u8 *)instruction) + args->jump.offset);
+                enemy->currentContext.time.current = SDL_Swap32(instruction->args.jump.time);
+                instruction = (EclRawInstr *)(((u8 *)instruction) + ((i32) SDL_Swap32(args->jump.offset)));
                 goto YOLO;
             case ECL_OPCODE_SETINT:
             case ECL_OPCODE_SETFLOAT:
-                EnemyEclInstr::SetVar(enemy, instruction->args.alu.res, &args->alu.arg1.i32Param);
+                EnemyEclInstr::SetVar(enemy, (EclVarId) SDL_Swap32(instruction->args.alu.res), &args->alu.arg1.i32Param);
                 break;
             case ECL_OPCODE_MATHNORMANGLE:
                 local_18 = *(f32 *)EnemyEclInstr::GetVar(enemy, &instruction->args.alu.res, NULL);
@@ -241,23 +244,23 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 break;
             case ECL_OPCODE_CALL:
             HANDLE_CALL:
-                local_14 = instruction->args.call.eclSub;
-                enemy->currentContext.currentInstr = (EclRawInstr *)((u8 *)instruction + instruction->offsetToNext);
-                if (enemy->flags.unk14 == 0)
+                local_14 = SDL_Swap32(instruction->args.call.eclSub);
+                enemy->currentContext.currentInstr = (EclRawInstr *)((u8 *)instruction + ((i16) SDL_Swap16(instruction->offsetToNext)));
+                if (enemy->flags.disableCallStack == 0)
                 {
                     memcpy(&enemy->savedContextStack[enemy->stackDepth], &enemy->currentContext,
                            sizeof(EnemyEclContext));
                 }
                 g_EclManager.CallEclSub(&enemy->currentContext, (u16)local_14);
-                if (enemy->flags.unk14 == 0 && enemy->stackDepth < 7)
+                if (enemy->flags.disableCallStack == 0 && enemy->stackDepth < 7)
                 {
                     enemy->stackDepth++;
                 }
-                enemy->currentContext.var0 = instruction->args.call.var0;
-                enemy->currentContext.float0 = instruction->args.call.float0;
+                enemy->currentContext.var0 = SDL_Swap32(instruction->args.call.var0);
+                enemy->currentContext.float0 = SwapLE32Float(instruction->args.call.float0);
                 continue;
             case ECL_OPCODE_RET:
-                if (enemy->flags.unk14)
+                if (enemy->flags.disableCallStack)
                 {
                     utils::DebugPrint2("error : no Stack Ret\n");
                 }
@@ -296,15 +299,15 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 break;
             case ECL_OPCODE_ANMSETMAIN:
                 g_AnmManager->SetAndExecuteScriptIdx(&enemy->primaryVm,
-                                                     instruction->args.anmSetMain.scriptIdx + ANM_SCRIPT_ENEMY_START);
+                                                     ((i32)SDL_Swap32(instruction->args.anmSetMain.scriptIdx)) + ANM_SCRIPT_ENEMY_START);
                 break;
             case ECL_OPCODE_ANMSETSLOT:
-                if (ARRAY_SIZE_SIGNED(enemy->vms) <= instruction->args.anmSetSlot.vmIdx)
+                if (ARRAY_SIZE_SIGNED(enemy->vms) <= (i32) SDL_Swap32(instruction->args.anmSetSlot.vmIdx))
                 {
                     utils::DebugPrint2("error : sub anim overflow\n");
                 }
-                g_AnmManager->SetAndExecuteScriptIdx(&enemy->vms[instruction->args.anmSetSlot.vmIdx],
-                                                     args->anmSetSlot.scriptIdx + ANM_SCRIPT_ENEMY_START);
+                g_AnmManager->SetAndExecuteScriptIdx(&enemy->vms[SDL_Swap32(instruction->args.anmSetSlot.vmIdx)],
+                                                     ((i32)SDL_Swap32(args->anmSetSlot.scriptIdx)) + ANM_SCRIPT_ENEMY_START);
                 break;
             case ECL_OPCODE_MOVEPOSITION:
                 enemy->position = instruction->args.move.pos;
@@ -356,10 +359,11 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
             case ECL_OPCODE_BULLETRANDOMANGLE:
             case ECL_OPCODE_BULLETRANDOMSPEED:
             case ECL_OPCODE_BULLETRANDOM:
+                // TODO
                 local_54 = &instruction->args.bullet;
                 local_58 = &enemy->bulletProps;
                 local_58->sprite = local_54->sprite;
-                local_58->aimMode = instruction->opCode - ECL_OPCODE_BULLETFANAIMED;
+                local_58->aimMode = SDL_Swap16(instruction->opCode) - ECL_OPCODE_BULLETFANAIMED;
                 local_58->count1 = *EnemyEclInstr::GetVar(enemy, &local_54->count1, NULL);
                 local_58->count1 += enemy->BulletRankAmount1(g_GameManager.rank);
                 if (local_58->count1 <= 0)
@@ -403,6 +407,7 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_BULLETEFFECTS:
+                // TODO
                 enemy->bulletProps.exInts[0] = *EnemyEclInstr::GetVar(enemy, &args->bulletEffects.ivar1, NULL);
                 enemy->bulletProps.exInts[1] = *EnemyEclInstr::GetVar(enemy, &args->bulletEffects.ivar2, NULL);
                 enemy->bulletProps.exInts[2] = *EnemyEclInstr::GetVar(enemy, &args->bulletEffects.ivar3, NULL);
@@ -419,12 +424,12 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 enemy->deathAnm3 = local_5c->deathAnm3;
                 break;
             case ECL_OPCODE_SHOOTINTERVAL:
-                enemy->shootInterval = instruction->args.setInt;
+                enemy->shootInterval = instruction->args.GetIntArg();
                 enemy->shootInterval += enemy->ShootInterval(g_GameManager.rank);
                 enemy->shootIntervalTimer.SetCurrent(0);
                 break;
             case ECL_OPCODE_SHOOTINTERVALDELAYED:
-                enemy->shootInterval = instruction->args.setInt;
+                enemy->shootInterval = instruction->args.GetIntArg();
                 enemy->shootInterval += enemy->ShootInterval(g_GameManager.rank);
                 if (enemy->shootInterval != 0)
                 {
@@ -442,12 +447,14 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 g_BulletManager.SpawnBulletPattern(&enemy->bulletProps);
                 break;
             case ECL_OPCODE_SHOOTOFFSET:
+                // TODO
                 enemy->shootOffset.x = *EnemyEclInstr::GetVarFloat(enemy, &args->move.pos.x, NULL);
                 enemy->shootOffset.y = *EnemyEclInstr::GetVarFloat(enemy, &args->move.pos.y, NULL);
                 enemy->shootOffset.z = *EnemyEclInstr::GetVarFloat(enemy, &args->move.pos.z, NULL);
                 break;
             case ECL_OPCODE_LASERCREATE:
             case ECL_OPCODE_LASERCREATEAIMED:
+                // TODO
                 local_64 = &instruction->args.laser;
                 local_60 = &enemy->laserProps;
                 local_60->position = enemy->position + enemy->shootOffset;
@@ -476,9 +483,11 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 enemy->lasers[enemy->laserStore] = g_BulletManager.SpawnLaserPattern(local_60);
                 break;
             case ECL_OPCODE_LASERINDEX:
+                // TODO
                 enemy->laserStore = *EnemyEclInstr::GetVar(enemy, &instruction->args.alu.res, NULL);
                 break;
             case ECL_OPCODE_LASERROTATE:
+                // TODO
                 if (enemy->lasers[instruction->args.laserOp.laserIdx] != NULL)
                 {
                     enemy->lasers[instruction->args.laserOp.laserIdx]->angle +=
@@ -486,6 +495,7 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_LASERROTATEFROMPLAYER:
+                // TODO
                 if (enemy->lasers[instruction->args.laserOp.laserIdx] != NULL)
                 {
                     enemy->lasers[instruction->args.laserOp.laserIdx]->angle =
@@ -494,15 +504,17 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_LASEROFFSET:
-                if (enemy->lasers[instruction->args.laserOp.laserIdx] != NULL)
+                if (enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)] != NULL)
                 {
-                    enemy->lasers[instruction->args.laserOp.laserIdx]->pos =
-                        enemy->position + instruction->args.laserOp.arg1;
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->pos = 
+                        instruction->args.laserOp.arg1;
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->pos.SwapToNativeEndian();
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->pos += enemy->position; 
                 }
                 break;
             case ECL_OPCODE_LASERTEST:
-                if (enemy->lasers[instruction->args.laserOp.laserIdx] != NULL &&
-                    enemy->lasers[instruction->args.laserOp.laserIdx]->inUse)
+                if (enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)] != NULL &&
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->inUse)
                 {
                     enemy->currentContext.compareRegister = 0;
                 }
@@ -512,12 +524,12 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_LASERCANCEL:
-                if (enemy->lasers[instruction->args.laserOp.laserIdx] != NULL &&
-                    enemy->lasers[instruction->args.laserOp.laserIdx]->inUse &&
-                    enemy->lasers[instruction->args.laserOp.laserIdx]->state < 2)
+                if (enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)] != NULL &&
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->inUse &&
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->state < 2)
                 {
-                    enemy->lasers[instruction->args.laserOp.laserIdx]->state = 2;
-                    enemy->lasers[instruction->args.laserOp.laserIdx]->timer.SetCurrent(0);
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->state = 2;
+                    enemy->lasers[SDL_Swap32(instruction->args.laserOp.laserIdx)]->timer.SetCurrent(0);
                 }
                 break;
             case ECL_OPCODE_LASERCLEARALL:
@@ -527,13 +539,13 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_BOSSSET:
-                if (instruction->args.setInt >= 0)
+                if (instruction->args.GetIntArg() >= 0)
                 {
-                    g_EnemyManager.bosses[instruction->args.setInt] = enemy;
+                    g_EnemyManager.bosses[instruction->args.GetIntArg()] = enemy;
                     g_Gui.bossPresent = 1;
                     g_Gui.SetBossHealthBar(1.0f);
                     enemy->flags.isBoss = 1;
-                    enemy->bossId = instruction->args.setInt;
+                    enemy->bossId = instruction->args.GetIntArg();
                 }
                 else
                 {
@@ -545,9 +557,10 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
             case ECL_OPCODE_SPELLCARDEFFECT:
                 local_6c = &instruction->args.spellcardEffect;
                 enemy->effectArray[enemy->effectIdx] = g_EffectManager.SpawnParticles(
-                    0xd, &enemy->position, 1, (ZunColor)g_EffectsColor[local_6c->effectColorId]);
+                    0xd, &enemy->position, 1, (ZunColor)g_EffectsColor[SDL_Swap32(local_6c->effectColorId)]);
                 enemy->effectArray[enemy->effectIdx]->pos2 = local_6c->pos;
-                enemy->effectDistance = local_6c->effectDistance;
+                enemy->effectArray[enemy->effectIdx]->pos2.SwapToNativeEndian();
+                enemy->effectDistance = SwapLE32Float(local_6c->effectDistance);
                 enemy->effectIdx++;
                 break;
             case ECL_OPCODE_MOVEDIRTIMEDECELERATE:
@@ -603,10 +616,10 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 enemy->flags.unk2 = 4;
                 break;
             case ECL_OPCODE_MOVEBOUNDSSET:
-                enemy->lowerMoveLimit.x = instruction->args.moveBoundSet.lowerMoveLimit.x;
-                enemy->lowerMoveLimit.y = instruction->args.moveBoundSet.lowerMoveLimit.y;
-                enemy->upperMoveLimit.x = instruction->args.moveBoundSet.upperMoveLimit.x;
-                enemy->upperMoveLimit.y = instruction->args.moveBoundSet.upperMoveLimit.y;
+                enemy->lowerMoveLimit = instruction->args.moveBoundSet.lowerMoveLimit;
+                enemy->lowerMoveLimit.SwapToNativeEndian();
+                enemy->upperMoveLimit = instruction->args.moveBoundSet.upperMoveLimit;
+                enemy->upperMoveLimit.SwapToNativeEndian();
                 enemy->flags.shouldClampPos = 1;
                 break;
             case ECL_OPCODE_MOVEBOUNDSDISABLE:
@@ -614,10 +627,12 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 break;
             case ECL_OPCODE_MOVERAND:
                 local_8 = instruction->args.move.pos;
+                local_8.SwapToNativeEndian();
                 enemy->angle = g_Rng.GetRandomF32InRange(local_8.y - local_8.x) + local_8.x;
                 break;
             case ECL_OPCODE_MOVERANDINBOUND:
                 local_8 = instruction->args.move.pos;
+                local_8.SwapToNativeEndian();
                 enemy->angle = g_Rng.GetRandomF32InRange(local_8.y - local_8.x) + local_8.x;
                 if (enemy->position.x < enemy->lowerMoveLimit.x + 96.0f)
                 {
@@ -651,41 +666,40 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_ANMSETPOSES:
-                enemy->anmExDefaults = instruction->args.anmSetPoses.anmExDefault;
-                enemy->anmExFarLeft = instruction->args.anmSetPoses.anmExFarLeft;
-                enemy->anmExFarRight = instruction->args.anmSetPoses.anmExFarRight;
-                enemy->anmExLeft = instruction->args.anmSetPoses.anmExLeft;
-                enemy->anmExRight = instruction->args.anmSetPoses.anmExRight;
+                enemy->anmExDefaults = (i16)SDL_Swap16(instruction->args.anmSetPoses.anmExDefault);
+                enemy->anmExFarLeft = (i16)SDL_Swap16(instruction->args.anmSetPoses.anmExFarLeft);
+                enemy->anmExFarRight = (i16)SDL_Swap16(instruction->args.anmSetPoses.anmExFarRight);
+                enemy->anmExLeft = (i16)SDL_Swap16(instruction->args.anmSetPoses.anmExLeft);
+                enemy->anmExRight = (i16)SDL_Swap16(instruction->args.anmSetPoses.anmExRight);
                 enemy->anmExFlags = 0xff;
                 break;
             case ECL_OPCODE_ENEMYSETHITBOX:
-                enemy->hitboxDimensions.x = instruction->args.move.pos.x;
-                enemy->hitboxDimensions.y = instruction->args.move.pos.y;
-                enemy->hitboxDimensions.z = instruction->args.move.pos.z;
+                enemy->hitboxDimensions = instruction->args.move.pos;
+                enemy->hitboxDimensions.SwapToNativeEndian();
                 break;
             case ECL_OPCODE_ENEMYFLAGCOLLISION:
-                enemy->flags.unk7 = instruction->args.setInt;
+                enemy->flags.unk7 = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_ENEMYFLAGCANTAKEDAMAGE:
-                enemy->flags.unk10 = instruction->args.setInt;
+                enemy->flags.unk10 = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_EFFECTSOUND:
-                g_SoundPlayer.PlaySoundByIdx((SoundIdx)instruction->args.setInt);
+                g_SoundPlayer.PlaySoundByIdx((SoundIdx)instruction->args.GetIntArg());
                 break;
             case ECL_OPCODE_ENEMYFLAGDEATH:
-                enemy->flags.unk11 = instruction->args.setInt;
+                enemy->flags.unk11 = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_DEATHCALLBACKSUB:
-                enemy->deathCallbackSub = instruction->args.setInt;
+                enemy->deathCallbackSub = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_ENEMYINTERRUPTSET:
-                enemy->interrupts[args->setInterrupt.interruptId] = args->setInterrupt.interruptSub;
+                enemy->interrupts[SDL_Swap32(args->setInterrupt.interruptId)] = SDL_Swap32(args->setInterrupt.interruptSub);
                 break;
             case ECL_OPCODE_ENEMYINTERRUPT:
-                enemy->runInterrupt = instruction->args.setInt;
+                enemy->runInterrupt = instruction->args.GetIntArg();
             HANDLE_INTERRUPT:
-                enemy->currentContext.currentInstr = (EclRawInstr *)((u8 *)instruction + instruction->offsetToNext);
-                if (enemy->flags.unk14 == 0)
+                enemy->currentContext.currentInstr = (EclRawInstr *)((u8 *)instruction + ((i16) SDL_Swap16(instruction->offsetToNext)));
+                if (enemy->flags.disableCallStack == 0)
                 {
                     memcpy(&enemy->savedContextStack[enemy->stackDepth], &enemy->currentContext,
                            sizeof(EnemyEclContext));
@@ -698,14 +712,14 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 enemy->runInterrupt = -1;
                 continue;
             case ECL_OPCODE_ENEMYLIFESET:
-                enemy->life = enemy->maxLife = instruction->args.setInt;
+                enemy->life = enemy->maxLife = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_SPELLCARDSTART:
-                g_Gui.ShowSpellcard(instruction->args.spellcardStart.spellcardSprite,
+                g_Gui.ShowSpellcard((i16) SDL_Swap16(instruction->args.spellcardStart.spellcardSprite),
                                     instruction->args.spellcardStart.spellcardName);
                 g_EnemyManager.spellcardInfo.isCapturing = 1;
                 g_EnemyManager.spellcardInfo.isActive = 1;
-                g_EnemyManager.spellcardInfo.idx = instruction->args.spellcardStart.spellcardId;
+                g_EnemyManager.spellcardInfo.idx = (i16) SDL_Swap16(instruction->args.spellcardStart.spellcardId);
                 g_EnemyManager.spellcardInfo.captureScore = g_SpellcardScore[g_EnemyManager.spellcardInfo.idx];
                 g_BulletManager.TurnAllBulletsIntoPoints();
                 g_Stage.spellcardState = RUNNING;
@@ -776,31 +790,32 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 g_Stage.spellcardState = NOT_RUNNING;
                 break;
             case ECL_OPCODE_BOSSTIMERSET:
-                enemy->bossTimer.SetCurrent(instruction->args.setInt);
+                enemy->bossTimer.SetCurrent(instruction->args.GetIntArg());
                 break;
             case ECL_OPCODE_LIFECALLBACKTHRESHOLD:
-                enemy->lifeCallbackThreshold = instruction->args.setInt;
+                enemy->lifeCallbackThreshold = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_LIFECALLBACKSUB:
-                enemy->lifeCallbackSub = instruction->args.setInt;
+                enemy->lifeCallbackSub = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_TIMERCALLBACKTHRESHOLD:
-                enemy->timerCallbackThreshold = instruction->args.setInt;
+                enemy->timerCallbackThreshold = instruction->args.GetIntArg();
                 enemy->bossTimer.SetCurrent(0);
                 break;
             case ECL_OPCODE_TIMERCALLBACKSUB:
-                enemy->timerCallbackSub = instruction->args.setInt;
+                enemy->timerCallbackSub = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_ENEMYFLAGINTERACTABLE:
-                enemy->flags.unk6 = instruction->args.setInt;
+                enemy->flags.unk6 = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_EFFECTPARTICLE:
+                // TODO
                 g_EffectManager.SpawnParticles(instruction->args.effectParticle.effectId, &enemy->position,
                                                instruction->args.effectParticle.numParticles,
                                                instruction->args.effectParticle.particleColor);
                 break;
             case ECL_OPCODE_DROPITEMS:
-                for (local_8c = 0; local_8c < instruction->args.setInt; local_8c++)
+                for (local_8c = 0; local_8c < instruction->args.GetIntArg(); local_8c++)
                 {
                     local_98 = enemy->position;
 
@@ -817,15 +832,15 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_ANMFLAGROTATION:
-                enemy->flags.unk13 = instruction->args.setInt;
+                enemy->flags.unk13 = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_EXINSCALL:
-                g_EclExInsn[instruction->args.setInt](enemy, instruction);
+                g_EclExInsn[instruction->args.GetIntArg()](enemy, instruction);
                 break;
             case ECL_OPCODE_EXINSREPEAT:
-                if (instruction->args.setInt >= 0)
+                if (instruction->args.GetIntArg() >= 0)
                 {
-                    enemy->currentContext.funcSetFunc = g_EclExInsn[instruction->args.setInt];
+                    enemy->currentContext.funcSetFunc = g_EclExInsn[instruction->args.GetIntArg()];
                 }
                 else
                 {
@@ -833,20 +848,22 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_TIMESET:
+                // TODO
                 enemy->currentContext.time.IncrementInline(
                     *EnemyEclInstr::GetVar(enemy, &instruction->args.timeSet.timeToSet, NULL));
                 break;
             case ECL_OPCODE_DROPITEMID:
-                g_ItemManager.SpawnItem(&enemy->position, instruction->args.dropItem.itemId, 0);
+                g_ItemManager.SpawnItem(&enemy->position, (ItemType) SDL_Swap32(instruction->args.dropItem.itemId), 0);
                 break;
             case ECL_OPCODE_STDUNPAUSE:
                 g_Stage.unpauseFlag = 1;
                 break;
             case ECL_OPCODE_BOSSSETLIFECOUNT:
-                g_Gui.eclSetLives = instruction->args.GetBossLifeCount();
+                g_Gui.eclSetLives = instruction->args.GetIntArg();
                 g_GameManager.counat += 1800;
                 break;
             case ECL_OPCODE_ENEMYCREATE:
+                // TODO
                 local_b0 = instruction->args.enemyCreate;
                 local_b0.pos.x = *EnemyEclInstr::GetVarFloat(enemy, &local_b0.pos.x, NULL);
                 local_b0.pos.y = *EnemyEclInstr::GetVarFloat(enemy, &local_b0.pos.y, NULL);
@@ -876,18 +893,18 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_ANMINTERRUPTMAIN:
-                enemy->primaryVm.pendingInterrupt = instruction->args.setInt;
+                enemy->primaryVm.pendingInterrupt = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_ANMINTERRUPTSLOT:
-                enemy->vms[args->anmInterruptSlot.vmId].pendingInterrupt = args->anmInterruptSlot.interruptId;
+                enemy->vms[SDL_Swap32(args->anmInterruptSlot.vmId)].pendingInterrupt = SDL_Swap32(args->anmInterruptSlot.interruptId);
                 break;
             case ECL_OPCODE_BULLETCANCEL:
                 g_BulletManager.TurnAllBulletsIntoPoints();
                 break;
             case ECL_OPCODE_BULLETSOUND:
-                if (instruction->args.bulletSound.bulletSfx >= 0)
+                if ((SoundIdx) SDL_Swap32(instruction->args.bulletSound.bulletSfx) >= 0)
                 {
-                    enemy->bulletProps.sfx = instruction->args.bulletSound.bulletSfx;
+                    enemy->bulletProps.sfx = (SoundIdx) SDL_Swap32(instruction->args.bulletSound.bulletSfx);
                     enemy->bulletProps.flags |= 0x200;
                 }
                 else
@@ -896,29 +913,29 @@ ZunResult EclManager::RunEcl(Enemy *enemy)
                 }
                 break;
             case ECL_OPCODE_ENEMYFLAGDISABLECALLSTACK:
-                enemy->flags.unk14 = instruction->args.setInt;
+                enemy->flags.disableCallStack = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_BULLETRANKINFLUENCE:
-                enemy->bulletRankSpeedLow = args->bulletRankInfluence.bulletRankSpeedLow;
-                enemy->bulletRankSpeedHigh = args->bulletRankInfluence.bulletRankSpeedHigh;
-                enemy->bulletRankAmount1Low = args->bulletRankInfluence.bulletRankAmount1Low;
-                enemy->bulletRankAmount1High = args->bulletRankInfluence.bulletRankAmount1High;
-                enemy->bulletRankAmount2Low = args->bulletRankInfluence.bulletRankAmount2Low;
-                enemy->bulletRankAmount2High = args->bulletRankInfluence.bulletRankAmount2High;
+                enemy->bulletRankSpeedLow = SwapLE32Float(args->bulletRankInfluence.bulletRankSpeedLow);
+                enemy->bulletRankSpeedHigh = SwapLE32Float(args->bulletRankInfluence.bulletRankSpeedHigh);
+                enemy->bulletRankAmount1Low = SDL_Swap32(args->bulletRankInfluence.bulletRankAmount1Low);
+                enemy->bulletRankAmount1High = SDL_Swap32(args->bulletRankInfluence.bulletRankAmount1High);
+                enemy->bulletRankAmount2Low = SDL_Swap32(args->bulletRankInfluence.bulletRankAmount2Low);
+                enemy->bulletRankAmount2High = SDL_Swap32(args->bulletRankInfluence.bulletRankAmount2High);
                 break;
             case ECL_OPCODE_ENEMYFLAGINVISIBLE:
-                enemy->flags.unk15 = instruction->args.setInt;
+                enemy->flags.unk15 = instruction->args.GetIntArg();
                 break;
             case ECL_OPCODE_BOSSTIMERCLEAR:
                 enemy->timerCallbackSub = enemy->deathCallbackSub;
                 enemy->bossTimer.SetCurrent(0);
                 break;
             case ECL_OPCODE_SPELLCARDFLAGTIMEOUT:
-                enemy->flags.unk16 = instruction->args.setInt;
+                enemy->flags.disableSpellTimeout = instruction->args.GetIntArg();
                 break;
             }
         NEXT_INSN:
-            instruction = (EclRawInstr *)((u8 *)instruction + instruction->offsetToNext);
+            instruction = (EclRawInstr *)((u8 *)instruction + ((i16) SDL_Swap16(instruction->offsetToNext)));
             goto YOLO;
         }
         else

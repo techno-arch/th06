@@ -179,7 +179,7 @@ void GameWindow::CreateGameWindow()
 
     if (g_Supervisor.cfg.windowed == 0)
     {
-        flags |= SDL_WINDOW_FULLSCREEN;
+//        flags |= SDL_WINDOW_FULLSCREEN;
     }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 1);

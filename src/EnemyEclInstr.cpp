@@ -96,12 +96,13 @@ void MoveTime(Enemy *enemy, EclRawInstr *instr)
     enemy->flags.unk1 = 2;
 }
 
+// eclVarId is a pointer to LE data
 i32 *GetVar(Enemy *enemy, EclVarId *eclVarId, EclValueType *valueType)
 {
     if (valueType != NULL)
         *valueType = ECL_VALUE_TYPE_UNDEFINED;
 
-    switch (*eclVarId)
+    switch ((i32) SDL_Swap32(*eclVarId))
     {
     case ECL_VAR_I32_0:
         if (valueType != NULL)

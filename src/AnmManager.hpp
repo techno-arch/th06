@@ -4,11 +4,13 @@
 // #include <d3dx8math.h>
 
 #include <SDL2/SDL_video.h>
+#include <SDL2/SDL_endian.h>
 
 #include "AnmIdx.hpp"
 #include "AnmVm.hpp"
 #include "GLFunc.hpp"
 #include "GameManager.hpp"
+#include "utils.hpp"
 #include "ZunResult.hpp"
 #include "ZunTimer.hpp"
 #include "diffbuild.hpp"
@@ -109,11 +111,9 @@ struct AnmRawSprite
 struct AnmRawScript
 {
     u32 id;
-    AnmRawInstr *firstInstruction;
+    u32 firstInstruction;
 };
 
-// WARNING: scripts seems unused, but if it were to be used,
-//   this would be dangerous for compatibility since AnmRawScript contains a pointer
 
 struct AnmRawEntry
 {
@@ -133,8 +133,35 @@ struct AnmRawEntry
     u32 hasData;
     u32 nextOffset;
     u32 unk2;
+    // These last two are actually flexible sizes based off the first 2 variables
     u32 spriteOffsets[10];
     AnmRawScript scripts[10];
+
+    void SwapToNativeEndian()
+    {
+        numSprites = SDL_Swap32(numSprites);
+        numScripts = SDL_Swap32(numScripts);
+        textureIdx = SDL_Swap32(textureIdx);
+        width = SDL_Swap32(width);
+        height = SDL_Swap32(height);
+        format = SDL_Swap32(format);
+        colorKey = SDL_Swap32(colorKey);
+        nameOffset = SDL_Swap32(nameOffset);
+        spriteIdxOffset = SDL_Swap32(spriteIdxOffset);
+        alphaNameOffset = SDL_Swap32(alphaNameOffset);
+        version = SDL_Swap32(version);
+        unk1 = SDL_Swap32(unk1);
+        textureOffset = SDL_Swap32(textureOffset);
+        hasData = SDL_Swap32(hasData);
+        nextOffset = SDL_Swap32(nextOffset);
+        unk2 = SDL_Swap32(unk2);
+
+        // This is revolting, but the way EoSD stores this doesn't give many other options
+        for(u32 i = 0; i < this->numSprites + this->numScripts * 2; i++)
+        {
+            spriteOffsets[i] = SDL_Swap32(spriteOffsets[i]);
+        }
+    }
 };
 ZUN_ASSERT_SIZE(AnmRawEntry, 0xb8);
 

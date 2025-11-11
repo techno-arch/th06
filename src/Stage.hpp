@@ -21,6 +21,15 @@ struct RawStageHeader
     char stageName[128];
     char songNames[4][128];
     char songPaths[4][128];
+
+    void SwapToNativeEndian()
+    {
+        nbObjects = SDL_Swap16(nbObjects);
+        nbFaces = SDL_Swap16(nbFaces);
+        facesOffset = SDL_Swap32(facesOffset);
+        scriptOffset = SDL_Swap32(scriptOffset);
+        unk_c = SDL_Swap32(unk_c);
+    }
 };
 ZUN_ASSERT_SIZE(RawStageHeader, 0x490);
 
@@ -32,6 +41,16 @@ struct RawStageQuadBasic
     i16 vmIdx;
     ZunVec3 position;
     ZunVec2 size;
+
+    void SwapToNativeEndian()
+    {
+        type = SDL_Swap16(type);
+        byteSize = SDL_Swap16(byteSize);
+        anmScript = SDL_Swap16(anmScript);
+        vmIdx = SDL_Swap16(vmIdx);
+        position.SwapToNativeEndian();
+        size.SwapToNativeEndian();
+    }
 };
 ZUN_ASSERT_SIZE(RawStageQuadBasic, 0x1c);
 
@@ -42,7 +61,14 @@ struct RawStageObject
     i8 flags;
     ZunVec3 position;
     ZunVec3 size;
-    RawStageQuadBasic firstQuad;
+    RawStageQuadBasic firstQuad; // Variable length
+
+    void SwapToNativeEndian()
+    {
+        id = SDL_Swap16(id);
+        position.SwapToNativeEndian();
+        size.SwapToNativeEndian();
+    }
 };
 ZUN_ASSERT_SIZE(RawStageObject, 0x38);
 
@@ -51,6 +77,13 @@ struct RawStageObjectInstance
     i16 id;
     i16 unk2;
     ZunVec3 position;
+
+    void SwapToNativeEndian()
+    {
+        id = SDL_Swap16(id);
+        unk2 = SDL_Swap16(unk2);
+        position.SwapToNativeEndian();
+    }
 };
 ZUN_ASSERT_SIZE(RawStageObjectInstance, 0x10);
 

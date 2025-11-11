@@ -19,7 +19,9 @@ i32 Ending::ReadEndFileParameter()
 {
     i32 readResult;
 
-    readResult = std::atol(this->endFileDataPtr);
+    // We're going to pray that ints are 4 bytes, I guess
+    //   Sorry to anyone that wanted to run EoSD on SPARC64 Solaris
+    readResult = std::atoi(this->endFileDataPtr);
     while (this->endFileDataPtr[0] != '\0')
     {
         this->endFileDataPtr++;

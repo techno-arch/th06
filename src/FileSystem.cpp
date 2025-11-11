@@ -20,6 +20,7 @@ u8 *FileSystem::OpenPath(const char *filepath, int isExternalResource)
     i32 pbg3Idx;
 
     entryIdx = -1;
+
     if (isExternalResource == 0)
     {
         entryname = std::strrchr(filepath, '\\');
@@ -40,6 +41,28 @@ u8 *FileSystem::OpenPath(const char *filepath, int isExternalResource)
         {
             entryname = entryname + 1;
         }
+
+        // Remove before commit
+
+        int pathLen = std::strlen(entryname);
+        char *path = (char *)std::malloc(pathLen + 10);
+        std::strcpy(path, "unpacked/");
+        std::strcat(path, entryname);
+        FILE *externalFile = std::fopen(path, "rb");
+        std::free(path);
+
+        if (externalFile != NULL)
+        {
+            std::fseek(externalFile, 0, SEEK_END);
+            u32 len = std::ftell(externalFile);
+            std::fseek(externalFile, 0, SEEK_SET);
+            g_LastFileSize = len;
+            void *retPtr = std::malloc(len);
+            std::fread(retPtr, len, 1, externalFile);
+            std::fclose(externalFile);
+            return (u8 *)retPtr;
+        }
+            
         if (g_Pbg3Archives != NULL)
         {
             for (pbg3Idx = 0; pbg3Idx < 0x10; pbg3Idx += 1)

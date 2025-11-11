@@ -59,6 +59,7 @@ struct AnmLoadedSprite
 #define AnmOpcode_30 30
 #define AnmOpcode_31 31
 
+// BE systems: not swapped in advance, so any multi-byte fields need to be byteswapped on-the-fly during scipt execution
 struct AnmRawInstr
 {
     i16 time;

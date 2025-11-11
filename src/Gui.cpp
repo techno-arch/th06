@@ -470,6 +470,9 @@ ZunResult Gui::LoadMsg(char *path)
         GameErrorContext::Log(&g_GameErrorContext, TH_ERR_GUI_MSG_FILE_CORRUPTED, path);
         return ZUN_ERROR;
     }
+
+    this->impl->msg.msgFile->numInstrs = SDL_Swap32(this->impl->msg.msgFile->numInstrs);
+
     this->impl->msg.currentMsgIdx = 0xffffffff;
     this->impl->msg.currentInstr = NULL;
 
@@ -478,7 +481,7 @@ ZunResult Gui::LoadMsg(char *path)
     for (idx = 0; idx < this->impl->msg.msgFile->numInstrs; idx++)
     {
         this->impl->msg.instrs[idx] =
-            (MsgRawInstr *)(((u8 *)+this->impl->msg.msgFile) + this->impl->msg.msgFile->instrsOffsets[idx]);
+            (MsgRawInstr *)(((u8 *)+this->impl->msg.msgFile) + SDL_Swap32(this->impl->msg.msgFile->instrsOffsets[idx]));
     }
     return ZUN_SUCCESS;
 }
@@ -539,7 +542,7 @@ ZunResult GuiImpl::RunMsg()
 {
     MsgRawInstrArgs *args;
 
-    if (this->msg.currentMsgIdx < 0)
+    if ((i32) SDL_Swap32(this->msg.currentMsgIdx) < 0)
     {
         return ZUN_ERROR;
     }
@@ -549,9 +552,9 @@ ZunResult GuiImpl::RunMsg()
     }
     if (this->msg.dialogueSkippable && IS_PRESSED(TH_BUTTON_SKIP))
     {
-        this->msg.timer.SetCurrent(this->msg.currentInstr->time);
+        this->msg.timer.SetCurrent(SDL_Swap16(this->msg.currentInstr->time));
     }
-    while ((i32)(this->msg.timer.current >= this->msg.currentInstr->time))
+    while ((i32)(this->msg.timer.current >= SDL_Swap16(this->msg.currentInstr->time)))
     {
         switch (this->msg.currentInstr->opcode)
         {
@@ -561,15 +564,15 @@ ZunResult GuiImpl::RunMsg()
         case MSG_OPCODE_PORTRAITANMSCRIPT:
             args = &this->msg.currentInstr->args;
             g_AnmManager->SetAndExecuteScriptIdx(
-                &this->msg.portraits[args->portraitAnmScript.portraitIdx],
-                args->portraitAnmScript.anmScriptIdx +
+                &this->msg.portraits[SDL_Swap16(args->portraitAnmScript.portraitIdx)],
+                SDL_Swap16(args->portraitAnmScript.anmScriptIdx) +
                     (args->portraitAnmScript.portraitIdx == 0 ? ANM_SCRIPT_FACE_START : ANM_SCRIPT_FACE_START + 2));
             break;
         case MSG_OPCODE_PORTRAITANMSPRITE:
             args = &this->msg.currentInstr->args;
             g_AnmManager->SetActiveSprite(
-                &this->msg.portraits[args->portraitAnmScript.portraitIdx],
-                args->portraitAnmScript.anmScriptIdx +
+                &this->msg.portraits[SDL_Swap16(args->portraitAnmScript.portraitIdx)],
+                SDL_Swap16(args->portraitAnmScript.anmScriptIdx) +
                     (args->portraitAnmScript.portraitIdx == 0 ? ANM_SCRIPT_FACE_START : ANM_SCRIPT_FACE_START + 8));
             break;
         case MSG_OPCODE_TEXTDIALOGUE:
@@ -577,16 +580,16 @@ ZunResult GuiImpl::RunMsg()
             if (args->text.textLine == 0 && 0 <= this->msg.dialogueLines[1].anmFileIndex)
             {
                 AnmManager::DrawVmTextFmt(g_AnmManager, &this->msg.dialogueLines[1],
-                                          this->msg.textColorsA[args->text.textColor],
-                                          this->msg.textColorsB[args->text.textColor], " ");
+                                          this->msg.textColorsA[SDL_Swap16(args->text.textColor)],
+                                          this->msg.textColorsB[SDL_Swap16(args->text.textColor)], " ");
             }
-            g_AnmManager->SetAndExecuteScriptIdx(&this->msg.dialogueLines[args->text.textLine],
-                                                 0x702 + args->text.textLine);
-            this->msg.dialogueLines[args->text.textLine].fontWidth =
-                this->msg.dialogueLines[args->text.textLine].fontHeight = this->msg.fontSize;
-            AnmManager::DrawVmTextFmt(g_AnmManager, &this->msg.dialogueLines[args->text.textLine],
-                                      this->msg.textColorsA[args->text.textColor],
-                                      this->msg.textColorsB[args->text.textColor], args->text.text);
+            g_AnmManager->SetAndExecuteScriptIdx(&this->msg.dialogueLines[SDL_Swap16(args->text.textLine)],
+                                                 0x702 + SDL_Swap16(args->text.textLine));
+            this->msg.dialogueLines[SDL_Swap16(args->text.textLine)].fontWidth =
+                this->msg.dialogueLines[SDL_Swap16(args->text.textLine)].fontHeight = this->msg.fontSize;
+            AnmManager::DrawVmTextFmt(g_AnmManager, &this->msg.dialogueLines[SDL_Swap16(args->text.textLine)],
+                                      this->msg.textColorsA[SDL_Swap16(args->text.textColor)],
+                                      this->msg.textColorsB[SDL_Swap16(args->text.textColor)], args->text.text);
             this->msg.framesElapsedDuringPause = 0;
             break;
         case MSG_OPCODE_WAIT:
@@ -594,7 +597,7 @@ ZunResult GuiImpl::RunMsg()
             {
                 if (!WAS_PRESSED(TH_BUTTON_SHOOT) || this->msg.framesElapsedDuringPause < 8)
                 {
-                    if (this->msg.framesElapsedDuringPause >= this->msg.currentInstr->args.wait)
+                    if (this->msg.framesElapsedDuringPause >= (i32) SDL_Swap32(this->msg.currentInstr->args.wait))
                     {
                         break;
                     }
@@ -607,11 +610,11 @@ ZunResult GuiImpl::RunMsg()
             args = &this->msg.currentInstr->args;
             if (args->anmInterrupt.unk1 < 2)
             {
-                this->msg.portraits[args->anmInterrupt.unk1].pendingInterrupt = args->anmInterrupt.unk2;
+                this->msg.portraits[SDL_Swap16(args->anmInterrupt.unk1)].pendingInterrupt = args->anmInterrupt.unk2;
             }
             else
             {
-                this->msg.dialogueLines[args->anmInterrupt.unk1 - 2].pendingInterrupt = args->anmInterrupt.unk2;
+                this->msg.dialogueLines[SDL_Swap16(args->anmInterrupt.unk1) - 2].pendingInterrupt = args->anmInterrupt.unk2;
             }
             break;
         case MSG_OPCODE_ECLRESUME:
@@ -623,19 +626,19 @@ ZunResult GuiImpl::RunMsg()
             this->songNameSprite.fontHeight = 16;
             AnmManager::DrawStringFormat(g_AnmManager, &this->songNameSprite, COLOR_RGB(COLOR_LIGHTCYAN),
                                          COLOR_RGB(COLOR_BLACK), TH_SONG_NAME,
-                                         g_Stage.stdData->songNames[this->msg.currentInstr->args.music]);
-            if (g_Supervisor.PlayMidiFile(this->msg.currentInstr->args.music) != ZUN_SUCCESS)
+                                         g_Stage.stdData->songNames[SDL_Swap32(this->msg.currentInstr->args.music)]);
+            if (g_Supervisor.PlayMidiFile(SDL_Swap32(this->msg.currentInstr->args.music)) != ZUN_SUCCESS)
             {
-                g_Supervisor.PlayAudio(g_Stage.stdData->songPaths[this->msg.currentInstr->args.music]);
+                g_Supervisor.PlayAudio(g_Stage.stdData->songPaths[SDL_Swap32(this->msg.currentInstr->args.music)]);
             }
             break;
         case MSG_OPCODE_TEXTINTRO:
             args = &this->msg.currentInstr->args;
-            g_AnmManager->SetAndExecuteScriptIdx(&this->msg.introLines[args->text.textLine],
-                                                 args->text.textLine + 0x704);
-            AnmManager::DrawStringFormat(g_AnmManager, &this->msg.introLines[args->text.textLine],
-                                         this->msg.textColorsA[args->text.textColor],
-                                         this->msg.textColorsB[args->text.textColor], args->text.text);
+            g_AnmManager->SetAndExecuteScriptIdx(&this->msg.introLines[SDL_Swap16(args->text.textLine)],
+                                                 SDL_Swap16(args->text.textLine) + 0x704);
+            AnmManager::DrawStringFormat(g_AnmManager, &this->msg.introLines[SDL_Swap16(args->text.textLine)],
+                                         this->msg.textColorsA[SDL_Swap16(args->text.textColor)],
+                                         this->msg.textColorsB[SDL_Swap16(args->text.textColor)], args->text.text);
             this->msg.framesElapsedDuringPause = 0;
             break;
         case MSG_OPCODE_STAGERESULTS:
@@ -687,7 +690,7 @@ ZunResult GuiImpl::RunMsg()
             }
             goto SKIP_TIME_INCREMENT;
         case MSG_OPCODE_WAITSKIPPABLE:
-            this->msg.dialogueSkippable = this->msg.currentInstr->args.dialogueSkippable;
+            this->msg.dialogueSkippable = SDL_Swap32(this->msg.currentInstr->args.dialogueSkippable);
             break;
         }
         this->msg.currentInstr =

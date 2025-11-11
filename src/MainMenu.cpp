@@ -110,7 +110,7 @@ ChainCallbackResult MainMenu::OnUpdate(MainMenu *menu)
         {
             menu->idleFrames = 0;
         }
-        if (720 <= menu->idleFrames)
+        if (0)
         {
             goto load_menu_rpy;
         }
@@ -124,7 +124,7 @@ ChainCallbackResult MainMenu::OnUpdate(MainMenu *menu)
             menu->idleFrames = 0;
         }
         menu->idleFrames = menu->idleFrames + 1;
-        if (720 <= menu->idleFrames)
+        if (0)
         {
         load_menu_rpy:
             g_GameManager.isInReplay = 1;

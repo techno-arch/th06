@@ -512,6 +512,8 @@ ZunResult AnmManager::LoadAnm(i32 anmIdx, const char *path, i32 spriteIdxOffset)
         return ZUN_ERROR;
     }
 
+    anm->SwapToNativeEndian();
+
     anm->textureIdx = anmIdx;
 
     char *anmName = (char *)((u8 *)anm + anm->nameOffset);
@@ -554,12 +556,16 @@ ZunResult AnmManager::LoadAnm(i32 anmIdx, const char *path, i32 spriteIdxOffset)
     {
         rawSprite = (AnmRawSprite *)((u8 *)anm + *curSpriteOffset);
 
+        rawSprite->id = SDL_Swap32(rawSprite->id);
+        rawSprite->offset.SwapToNativeEndian();
+        rawSprite->size.SwapToNativeEndian();
+
         AnmLoadedSprite loadedSprite;
         loadedSprite.sourceFileIndex = this->anmFiles[anmIdx]->textureIdx;
         loadedSprite.startPixelInclusive.x = rawSprite->offset.x;
         loadedSprite.startPixelInclusive.y = rawSprite->offset.y;
-        loadedSprite.endPixelInclusive.x = rawSprite->offset.x + rawSprite->size.x;
-        loadedSprite.endPixelInclusive.y = rawSprite->offset.y + rawSprite->size.y;
+        loadedSprite.endPixelInclusive.x = loadedSprite.startPixelInclusive.x + rawSprite->size.x;
+        loadedSprite.endPixelInclusive.y = loadedSprite.startPixelInclusive.y + rawSprite->size.y;
         loadedSprite.textureWidth = (float)anm->width;
         loadedSprite.textureHeight = (float)anm->height;
         this->LoadSprite(rawSprite->id + spriteIdxOffset, &loadedSprite);
@@ -1290,10 +1296,10 @@ ZunResult AnmManager::Draw2(AnmVm *vm)
     return ZUN_SUCCESS;
 }
 
-#define AnmF32Arg(index) (*(f32 *)&curInstr->args[index])
-#define AnmI32Arg(index) (*(i32 *)&curInstr->args[index])
-#define AnmU32Arg(index) (*(u32 *)&curInstr->args[index])
-#define AnmI16Arg(index) (*(i16 *)&curInstr->args[index])
+#define AnmF32Arg(index) (SwapLE32Float(curInstr->args[index]))
+#define AnmI32Arg(index) ((i32)(SDL_Swap32(curInstr->args[index])))
+#define AnmU32Arg(index) (SDL_Swap32(curInstr->args[index]))
+#define AnmI16Arg(index) (SDL_Swap16(curInstr->args[index]))
 
 i32 AnmManager::ExecuteScript(AnmVm *vm)
 {
@@ -1316,7 +1322,7 @@ i32 AnmManager::ExecuteScript(AnmVm *vm)
         goto yolo;
     }
 
-    while (curInstr = vm->currentInstruction, curInstr->time <= vm->currentTimeInScript.AsFrames())
+    while (curInstr = vm->currentInstruction, SwapToI16(curInstr->time) <= vm->currentTimeInScript.AsFrames())
     {
         switch (curInstr->opcode)
         {
@@ -1348,7 +1354,7 @@ i32 AnmManager::ExecuteScript(AnmVm *vm)
             break;
         case AnmOpcode_Jump:
             vm->currentInstruction = (AnmRawInstr *)(((u8 *)vm->beginingOfScript->args) + AnmI32Arg(0) - 4);
-            vm->currentTimeInScript.current = vm->currentInstruction->time;
+            vm->currentTimeInScript.current = SwapToI16(vm->currentInstruction->time);
             continue;
         case AnmOpcode_FlipX:
             vm->flags.flip ^= 1;
@@ -1465,7 +1471,7 @@ i32 AnmManager::ExecuteScript(AnmVm *vm)
 
             curInstr = (AnmRawInstr *)(((u8 *)curInstr->args) + curInstr->argsCount);
             vm->currentInstruction = curInstr;
-            vm->currentTimeInScript.SetCurrent(vm->currentInstruction->time);
+            vm->currentTimeInScript.SetCurrent(SwapToI16(vm->currentInstruction->time));
             vm->flags.isVisible = 1;
             continue;
         case AnmOpcode_SetVisibility:
