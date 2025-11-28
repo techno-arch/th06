@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-    - uses: BEASTSM96/premake-action@v1.4
+    - uses: Jarod42/install-premake5@v6
     - uses: actions/checkout@v4
     - name: configure
       run: premake5 gmake && apt-get update && apt install build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
