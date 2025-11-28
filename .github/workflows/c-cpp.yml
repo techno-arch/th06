@@ -28,12 +28,12 @@ jobs:
           cd premake-core
           git checkout fbc341d  # Checkout the specific commit
           make -f Bootstrap.mak linux PLATFORM=ARM64
-          sudo cp ./bin/release/premake5 /usr/local/bin
+
 
       # Step 4: Set up Premake
       - name: Set up Premake
         run: |
-          sudo cp ./bin/release/premake5 /usr/local/bin
+          sudo cp $(find |grep -v premake5* |grep premake5) /usr/local/bin
 
       # Step 5: Generate build files with Premake
       - name: Generate build files with Premake
