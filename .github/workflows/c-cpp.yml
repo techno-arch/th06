@@ -42,10 +42,10 @@ jobs:
       # Step 6: Install dependencies (SDL2, etc.)
       - name: Install dependencies
         run: |
-          sudo apt-get install -y build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
+          sudo apt-get install -y libsdl2-2.0-0 build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
 
       # Step 7: Build the project
       - name: Build the project
         run: |
           cd build
-          make
+          make -j$(nproc)
