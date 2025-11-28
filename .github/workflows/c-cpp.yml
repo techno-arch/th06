@@ -13,7 +13,11 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-    - uses: Jarod42/install-premake5@v6
+    - uses: eariassoto/setup-premake@v1
+      with:
+        version: '5.0.0-beta1'
+        action: 'gmake'
+        options: '--cc=gcc'
     - uses: actions/checkout@v4
     - name: configure
       run: premake5 gmake && apt-get update && apt install build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
