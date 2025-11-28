@@ -1,6 +1,5 @@
 name: C/C++ CI
 
-
 on:
   push:
     branches: [ "portable" ]
@@ -15,34 +14,34 @@ jobs:
       # Step 1: Checkout repository
       - uses: actions/checkout@v4
 
-      # Step 2: Install dependencies
+      # Step 2: Install build essentials and SDL2 dependencies
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential git uuid-dev
+          sudo apt-get install -y build-essential git uuid-dev libsdl2-2.0-0 libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
 
-      # Step 3: Clone the Premake repository and checkout the specific commit (fbc341d)
+      # Step 3: Clone Premake repository and checkout commit
       - name: Clone Premake repository at commit fbc341d
         run: |
           git clone https://github.com/premake/premake-core.git
           cd premake-core
-          git checkout fbc341d  # Checkout the specific commit
+          git checkout fbc341d
           make -f Bootstrap.mak linux PLATFORM=ARM64
-
 
       # Step 4: Set up Premake
       - name: Set up Premake
         run: |
-          sudo cp $(find |grep -v premake5* |grep premake5) /usr/local/bin
+          sudo cp $(find | grep -v premake5* | grep premake5) /usr/local/bin
 
       # Step 5: Generate build files with Premake
       - name: Generate build files with Premake
         run: premake5 gmake --cc=gcc
 
-      # Step 6: Install dependencies (SDL2, etc.)
-      - name: Install dependencies
+      # Step 6: Ensure SDL2 and libraries are linked correctly
+      - name: Set SDL2 link flags in Makefile
         run: |
-          sudo apt-get install -y libsdl2-2.0-0 build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
+          # Modify Makefile to ensure SDL2 is linked
+          sed -i '/LDFLAGS/ s/$/ -lSDL2/' Makefile
 
       # Step 7: Build the project
       - name: Build the project
