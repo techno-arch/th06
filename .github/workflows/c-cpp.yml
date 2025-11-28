@@ -37,14 +37,10 @@ jobs:
       - name: Generate build files with Premake
         run: premake5 gmake --cc=gcc
 
-      # Step 6: Ensure SDL2 and libraries are linked correctly
-      - name: Set SDL2 link flags in Makefile
-        run: |
-          # Modify Makefile to ensure SDL2 is linked
-          sed -i '/LDFLAGS/ s/$/ -lSDL2/' Makefile
 
       # Step 7: Build the project
       - name: Build the project
         run: |
           cd build
+          sed -i '/LDFLAGS/ s/$/ -lSDL2/' Makefile
           make -j$(nproc)
