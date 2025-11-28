@@ -9,17 +9,40 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-24.04-arm
-
     steps:
-    - uses: eariassoto/setup-premake@v1
-      with:
-        version: '5.0.0-beta1'
-        action: 'gmake'
-        options: '--cc=gcc'
-    - name: configure
-      run: apt-get update && apt install build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
-    - name: make
-      run: cd build && make
+      # Step 1: Checkout code
+      - uses: actions/checkout@v4
 
+      # Step 2: Install dependencies to build Premake from source
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git
+
+      # Step 3: Clone Premake repository and build from source
+      - name: Build Premake from source
+        run: |
+          git clone --branch v5.0.0-beta1 https://github.com/premake/premake-core.git
+          cd premake-core
+          make
+
+      # Step 4: Set up Premake (now built from source)
+      - name: Set up Premake
+        run: |
+          sudo cp premake5 /usr/local/bin
+
+      # Step 5: Generate build files
+      - name: Generate build files with Premake
+        run: premake5 gmake --cc=gcc
+
+      # Step 6: Install dependencies
+      - name: Install dependencies
+        run: |
+          sudo apt-get install -y build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
+
+      # Step 7: Build the project
+      - name: Build the project
+        run: |
+          cd build
+          make
