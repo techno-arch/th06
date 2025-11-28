@@ -44,3 +44,9 @@ jobs:
           cd build
           sed -i '/LDFLAGS/ s/$/ -lSDL2/' Makefile
           make -j$(nproc)
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: th06
+          path: /th06 
