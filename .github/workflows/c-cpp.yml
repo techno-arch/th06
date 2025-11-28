@@ -18,9 +18,8 @@ jobs:
         version: '5.0.0-beta1'
         action: 'gmake'
         options: '--cc=gcc'
-    - uses: actions/checkout@v4
     - name: configure
-      run: premake5 gmake && apt-get update && apt install build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
+      run: apt-get update && apt install build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libasound2-dev
     - name: make
       run: cd build && make
 
