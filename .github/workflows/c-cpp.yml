@@ -32,7 +32,7 @@ jobs:
       # Step 4: Set up Premake
       - name: Set up Premake
         run: |
-          sudo cp premake5 /usr/local/bin
+          sudo cp bin/release/premake5 /usr/local/bin
 
       # Step 5: Generate build files with Premake
       - name: Generate build files with Premake
