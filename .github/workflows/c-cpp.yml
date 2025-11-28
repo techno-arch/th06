@@ -27,7 +27,7 @@ jobs:
           git clone https://github.com/premake/premake-core.git
           cd premake-core
           git checkout fbc341d  # Checkout the specific commit
-          make Bootstrap.mak linux PLATFORM=ARM64
+          make -f Bootstrap.mak linux PLATFORM=ARM64
 
       # Step 4: Set up Premake
       - name: Set up Premake
